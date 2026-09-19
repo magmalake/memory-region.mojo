@@ -1,0 +1,51 @@
+[workspace]
+authors = ["Marius S <39998+winding-lines@users.noreply.github.com>"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "memory-region.mojo"
+version = "0.1.0"
+description = "Bytes that survive being moved: a region — heap or shared mapping — and a bump allocator that hands out offsets rather than addresses."
+preview = ["pixi-build"]
+platforms = ["osx-arm64", "linux-64"]
+
+[tasks]
+# POSIX mmap/munmap/open/ftruncate only — no shim to build, so consumers just
+# `-I ../memory-region.mojo/src`.
+test = "mojo run -I src tests/test_memory_region.mojo"
+
+lint = { cmd = "mojolint --lsp -I src src tests" }
+
+# ── pixi-build: consumable as a pixi source dependency ──────────────────────
+# Conda package name is memory-region-mojo; the import stays
+# `from memory_region import …`.
+[package]
+name = "memory-region-mojo"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-mojo", version = "0.*" }
+
+[package.build.config.pkg]
+path = "src/memory_region"
+name = "memory_region"
+
+[package.host-dependencies]
+mojo-compiler = "==1.0.0"
+
+[package.build-dependencies]
+mojo-compiler = "==1.0.0"
+
+[package.run-dependencies]
+mojo-compiler = ">=1.0.0,<2"
+
+[feature.nightly.dependencies]
+modular = ">=26.6.0.dev2026082605,<27"
+
+[feature.stable.dependencies]
+mojo-compiler = "==1.0.0"
+
+[environments]
+default = ["nightly"]
+stable = ["stable"]
+
+[dependencies]
+lint-mojo = { git = "https://github.com/magmalake/lint.mojo.git", rev = "3fa66644756c1de7aece83e5a89375323b6e0ce7" }

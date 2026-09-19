@@ -1,0 +1,5 @@
+name = "memory-region-mojo"
+version = "0.1.0"
+description = "A region of bytes — heap or shared mapping — carved by a bump allocator that returns offsets, so the result can be read wherever it lands"
+tags = ["memory", "mmap", "shared-memory", "allocator", "arena", "arrow"]
+tins = []
