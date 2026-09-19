@@ -6,14 +6,12 @@
 
 Part of [**magmalake**](https://magmalake.org) — data lake building blocks in Mojo.
 
-Bytes that survive being moved.
 
-A **region** is a contiguous byte range, however it was obtained: an ordinary
-allocation, or a file mapped `MAP_SHARED` that another process can map by
-name. A `Bump` carves one up. The rule that makes it worth a library is that
-`take` returns an **offset**, not an address — so whatever you build inside a
+A **region** is a contiguous byte range that is internally addressable by offset 
+not by pointers to memory.  Whatever you build inside a
 region can be read by anyone who can see the bytes, wherever their address
-space happens to put them.
+space happens to put them. The first use case is transmitting Arrow data through
+shared memory.
 
 ## Install
 
@@ -52,7 +50,6 @@ var payload_offset = Pointer[Int64, ImmUntrackedOrigin](
 
 The second mapping lands at a different address than the first. Everything
 still resolves, because nothing inside the region was written as an address.
-That is the whole library, and it is what the test suite checks.
 
 ## What you get
 
@@ -67,34 +64,22 @@ That is the whole library, and it is what the test suite checks.
 Arrow wants every buffer 8-byte aligned so a consumer can cast it in place, so
 alignment is the allocator's job here rather than each caller's.
 
-## What it does not do
+## Limitations
 
-**Grow.** A region is a fixed range and `take` raises rather than
+**Fixed size.** A region is a fixed range and `take` raises rather than
 reallocating — nothing that has already handed out an offset can afford to
 move. Size it up front. A producer that knows its total (a batch whose buffers
 already exist) sizes it exactly; one that does not can over-allocate a
 mapping, since untouched pages never materialise, and truncate afterwards.
 
-**Free a piece.** The whole region goes at once. That is the usual arena trade
+**Monolithic deallocation.** The whole region goes at once. That is the usual arena trade
 and it suits data that dies together.
 
-**Describe itself.** A reader needs a manifest of some kind, and what that
+**Not self describing.** A reader needs a manifest of some kind, and what that
 looks like belongs to whoever owns the payload. `arrow-mlake` builds an Arrow
 C Data Interface layout in one of these; a different caller would build
 something else.
 
-## Why it exists
-
-Arrow's C Data Interface hands over **pointers**, which mean nothing in
-another address space — so the one thing it cannot do is cross a process. A
-mapping can. Building the same buffers in a region, by offset, is what lets a
-reader in one process hand a batch to a consumer in another without
-serialising it.
-
-Nothing about that is Arrow-specific, which is why this is its own tin. The
-same contract — size up front, fill, publish, map elsewhere — is what a
-shared-memory object store like Ray's Plasma offers, and a `Region` over
-pinned or device memory would serve a GPU handoff.
 
 ## Development
 
