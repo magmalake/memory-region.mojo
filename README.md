@@ -27,16 +27,18 @@ shape if your tooling needs it.
 ## The idea
 
 ```mojo
-from memory_region import Bump, MappedRegion, map_shared
+from memory_region import BumpAllocator, MappedRegion, map_shared
 
 # Producer: lay a structure out in a shared mapping.
-var bump = Bump[MappedRegion](MappedRegion("/tmp/batch", 1 << 20))
-var header = bump.take(8)
-var payload = bump.take(4096)
-bump.words_at(header)[unsafe_offset=0] = Int64(payload)   # an offset, not a pointer
-var p = bump.ptr_at(payload)
+var bump = BumpAllocator[MappedRegion](MappedRegion("/tmp/batch", 1 << 20))
+var header = bump.claim(8)
+var payload = bump.append(some_bytes)          # copies, returns where it went
+bump.unsafe_ptr(header).unsafe_bitcast[Int64]()[unsafe_offset=0] = Int64(
+    payload                                     # an offset, not a pointer
+)
 ...
-bump^.release()          # unmaps; the file stays
+# unmapped at end of scope, or `bump^.close()` now, or `bump^.into_raw()` to
+# hand the bytes to a consumer that will free them itself
 ```
 
 ```mojo
@@ -55,18 +57,24 @@ still resolves, because nothing inside the region was written as an address.
 
 | | |
 |---|---|
-| `Region` | a trait: `base()`, `size()`, `release()` |
+| `Region` | a trait: `base()`, `size()`, `close()`, `into_raw()` |
 | `HeapRegion` | an ordinary allocation |
 | `MappedRegion` | a file mapped `MAP_SHARED`, addressable by path |
-| `Bump[R]` | 8-byte-aligned offsets, front to back |
+| `BumpAllocator[R]` | `claim(n)` and `append(span)`, both returning offsets |
+| `unsafe_ptr` / `unsafe_address` | an offset made usable, in this process only |
 | `map_shared` | the consumer's half: map an existing file read-only |
+
+A region frees or unmaps itself at end of scope, because a leaked mapping has
+no other symptom — no error, no crash, nothing in the output. `into_raw()` is
+the other ending: it consumes the region so the destructor does not run, for
+bytes that become a consumer's.
 
 Arrow wants every buffer 8-byte aligned so a consumer can cast it in place, so
 alignment is the allocator's job here rather than each caller's.
 
 ## Limitations
 
-**Fixed size.** A region is a fixed range and `take` raises rather than
+**Fixed size.** A region is a fixed range and `claim` raises rather than
 reallocating — nothing that has already handed out an offset can afford to
 move. Size it up front. A producer that knows its total (a batch whose buffers
 already exist) sizes it exactly; one that does not can over-allocate a
