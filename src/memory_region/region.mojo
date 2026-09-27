@@ -19,7 +19,7 @@ readable at the call site instead of being implied by an omission.
 Mojo can do better than this: `@explicit_destroy` with a `not Deinitable`
 conformance makes abandoning a region a *compile* error naming the method to
 call. It is not used here because it needs a September-2026 nightly, and these
-tins build on `mojo-compiler` 1.0.0. Worth revisiting when stable catches up —
+tins build on `mojo-compiler` 1.1.0. Worth revisiting when stable catches up —
 it turns a safe default into an impossible mistake.
 """
 
