@@ -14,12 +14,14 @@ lands at a different address in every process that maps it, so an address
 written into it means something only to the process that wrote it; a reader
 adds its own `base()` and everything resolves.
 
-`unsafe_address` is the one way back to a real pointer, for the moment a value
-has to be written into a C structure whose consumer is this process.
+`span` is how to read and write what has been claimed: a typed view that
+borrows the allocator, so the compiler knows when it stops being valid.
+`unsafe_address` is the way back to a raw address, for the moment one has to
+be written into a C structure whose consumer is this process.
 """
 
 from memory_region.region import Region
-from std.memory import unsafe_memcpy
+from std.sys.info import align_of, size_of
 
 
 struct BumpAllocator[R: Region & Deinitable](Movable):
@@ -61,18 +63,53 @@ struct BumpAllocator[R: Region & Deinitable](Movable):
             )
         return at
 
-    def append(mut self, data: Span[UInt8, _]) raises -> Int:
+    def append[
+        dtype: DType, //
+    ](mut self, data: Span[Scalar[dtype], _]) raises -> Int:
         """Claim room for `data`, copy it in, and return where it went.
 
-        The pairing `claim` was always used in — both of this library's first
-        two callers wrote it for themselves before it lived here.
+        Any scalar element type, so a buffer of `Int32` offsets goes in as
+        itself rather than as an address and a byte count.
         """
-        var at = self.claim(len(data) if len(data) else 1)
+        var at = self.claim(
+            len(data) * size_of[Scalar[dtype]]() if len(data) else 1
+        )
         if len(data):
-            unsafe_memcpy(
-                dest=self.unsafe_ptr(at), src=data.unsafe_ptr(), count=len(data)
-            )
+            self.span[dtype](at, len(data)).copy_from(data)
         return at
+
+    def span[
+        dtype: DType
+    ](ref self, offset: Int, count: Int) -> Span[
+        Scalar[dtype], origin_of(self)
+    ]:
+        """`count` values of `dtype` at `offset`, as a view of this allocator.
+
+        The view borrows the allocator: writable when the allocator is
+        reached through `mut`, read-only otherwise, and unusable once it is
+        closed, moved or dropped — all checked by the compiler. Claiming more
+        while a view is alive is fine, because `claim` never moves anything.
+
+        The offset is one this allocator handed out, so a bad one is a bug
+        rather than bad input: it is a `debug_assert` against what has been
+        claimed, not a raise.
+        """
+        comptime assert dtype != DType.bool, "read Bool bytes as uint8"
+        comptime assert (
+            align_of[Scalar[dtype]]() <= 8
+        ), "claims are 8-byte aligned"
+        debug_assert(
+            offset >= 0
+            and count >= 0
+            and offset + count * size_of[Scalar[dtype]]() <= self.used,
+            "memory_region: span outside what has been claimed",
+        )
+        return Span[Scalar[dtype], origin_of(self)](
+            unsafe_ptr=Pointer[Scalar[dtype], origin_of(self)](
+                unsafe_from_address=self.region.base() + offset
+            ),
+            length=count,
+        )
 
     def unsafe_ptr(self, offset: Int) -> Pointer[UInt8, MutUntrackedOrigin]:
         """A writable pointer to `offset`, valid in this process only."""

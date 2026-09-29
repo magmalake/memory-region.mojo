@@ -162,5 +162,39 @@ def test_a_shared_mapping_refuses_an_empty_file() raises:
     with assert_raises(contains="is empty"):
         _ = SharedMapping(path)
 
+
+def test_a_span_reads_and_writes_what_was_claimed() raises:
+    var bump = BumpAllocator[HeapRegion](HeapRegion(256))
+    _ = bump.claim(3)  # so the next offset is not 0
+    var at = bump.claim(4 * 8)
+    var values = bump.span[DType.float64](at, 4)  # through `mut`: writable
+    for i in range(4):
+        values[i] = Float64(i) * 1.5
+    # Claiming more does not move anything, so the view stays good.
+    _ = bump.claim(16)
+    assert_equal(values[3], 4.5)
+    assert_equal(_sum(bump, at), 9.0)
+
+
+def _sum(bump: BumpAllocator[HeapRegion], at: Int) -> Float64:
+    """Through a read-only borrow the same call gives a read-only view."""
+    var total = Float64(0)
+    for x in bump.span[DType.float64](at, 4):
+        total += x
+    return total
+
+
+def test_append_takes_any_scalar_buffer() raises:
+    var bump = BumpAllocator[HeapRegion](HeapRegion(256))
+    var offsets: List[Int32] = [0, 3, 7, 12]
+    var at = bump.append(Span(offsets))
+    assert_equal(at, 0)
+    var back = bump.span[DType.int32](at, 4)
+    for i in range(4):
+        assert_equal(back[i], offsets[i])
+    # 16 bytes of Int32, so the next claim is at 16.
+    assert_equal(bump.claim(1), 16)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
