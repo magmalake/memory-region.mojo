@@ -231,16 +231,23 @@ struct SharedMapping(Movable):
         aligned for `dtype` — both things a manifest from another process can
         get wrong, and neither of which a type can rule out.
         """
-        comptime assert dtype != DType.bool, (
-            "Bool is not valid for every bit pattern; read the bytes as uint8"
-        )
+        comptime assert (
+            dtype != DType.bool
+        ), "Bool is not valid for every bit pattern; read the bytes as uint8"
         comptime width = size_of[Scalar[dtype]]()
         comptime align = align_of[Scalar[dtype]]()
         if offset < 0 or count < 0 or offset > self._size:
             raise Error(
                 String(
-                    "memory_region: ", count, " values at ", offset,
-                    " are outside ", self.path, " (", self._size, " bytes)",
+                    "memory_region: ",
+                    count,
+                    " values at ",
+                    offset,
+                    " are outside ",
+                    self.path,
+                    " (",
+                    self._size,
+                    " bytes)",
                 )
             )
         # Compared by division, so a huge count from a bad manifest cannot
@@ -248,16 +255,26 @@ struct SharedMapping(Movable):
         if count > (self._size - offset) // width:
             raise Error(
                 String(
-                    "memory_region: ", count, " values at ", offset,
-                    " run past the end of ", self.path, " (", self._size,
+                    "memory_region: ",
+                    count,
+                    " values at ",
+                    offset,
+                    " run past the end of ",
+                    self.path,
+                    " (",
+                    self._size,
                     " bytes)",
                 )
             )
         if offset % align != 0:
             raise Error(
                 String(
-                    "memory_region: offset ", offset, " is not aligned to ",
-                    align, " for ", dtype,
+                    "memory_region: offset ",
+                    offset,
+                    " is not aligned to ",
+                    align,
+                    " for ",
+                    dtype,
                 )
             )
         return Span[Scalar[dtype], origin_of(self)](
