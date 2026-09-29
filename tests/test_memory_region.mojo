@@ -8,7 +8,12 @@ the whole library exists to provide and the thing that would be impossible if
 
 from std.testing import TestSuite, assert_equal, assert_raises, assert_true
 
-from memory_region import BumpAllocator, HeapRegion, MappedRegion, map_shared
+from memory_region import (
+    BumpAllocator,
+    HeapRegion,
+    MappedRegion,
+    SharedMapping,
+)
 
 
 def test_a_dropped_region_frees_itself() raises:
@@ -95,21 +100,67 @@ def test_offsets_are_independent_of_where_the_region_landed() raises:
     bump^.close()
 
     # The peer's half: a second, independent mapping of the same bytes.
-    var mapped = map_shared(path)
-    var reader_base = mapped[0]
-    var where = Pointer[Int64, ImmUntrackedOrigin](
-        unsafe_from_address=reader_base + head
-    )
-    var payload_offset = Int(where[unsafe_offset=0])
+    var mapped = SharedMapping(path)
+    var payload_offset = Int(mapped.span[DType.int64](head, 1)[0])
     assert_equal(payload_offset, payload)
-    var q = Pointer[UInt8, ImmUntrackedOrigin](
-        unsafe_from_address=reader_base + payload_offset
-    )
+    var q = mapped.span[DType.uint8](payload_offset, 4)
     for i in range(4):
-        assert_equal(Int(q[unsafe_offset=i]), 0xA0 + i)
+        assert_equal(Int(q[i]), 0xA0 + i)
     _ = writer_base
-    _ = reader_base
 
+
+def _publish(path: String, values: List[Float64]) raises -> Int:
+    """Write `values` into a fresh mapping at `path`; returns their offset."""
+    var bump = BumpAllocator[MappedRegion](MappedRegion(path, 4096))
+    _ = bump.claim(8)  # something in front, so the offset is not 0
+    var at = bump.claim(len(values) * 8)
+    var p = bump.unsafe_ptr(at).unsafe_bitcast[Float64]()
+    for i in range(len(values)):
+        p[unsafe_offset=i] = values[i]
+    bump^.close()
+    return at
+
+
+def test_a_shared_mapping_reads_by_offset() raises:
+    var path = String("/tmp/memory_region_shared_test.bin")
+    var at = _publish(path, [1.5, 2.5, 4.0])
+    var mapped = SharedMapping(path)
+    assert_equal(mapped.size(), 4096)
+    var total = Float64(0)
+    for x in mapped.span[DType.float64](at, 3):
+        total += x
+    assert_equal(total, 8.0)
+    assert_equal(len(mapped.bytes()), 4096)
+
+
+def test_a_shared_mapping_refuses_what_does_not_fit() raises:
+    """Offsets come from another process, so they are checked, not trusted."""
+    var path = String("/tmp/memory_region_shared_bounds.bin")
+    _ = _publish(path, [1.0])
+    var mapped = SharedMapping(path)
+    # the last 8 bytes fit; one more value does not
+    _ = mapped.span[DType.float64](4088, 1)
+    with assert_raises(contains="run past the end"):
+        _ = mapped.span[DType.float64](4088, 2)
+    with assert_raises(contains="outside"):
+        _ = mapped.span[DType.uint8](-8, 1)
+    with assert_raises(contains="outside"):
+        _ = mapped.span[DType.uint8](4097, 0)
+    # a count big enough to overflow offset + count * 8 back into range
+    with assert_raises(contains="run past the end"):
+        _ = mapped.span[DType.float64](8, Int.MAX // 4)
+    with assert_raises(contains="not aligned"):
+        _ = mapped.span[DType.float64](12, 1)
+    # zero values at the very end is a legitimate empty buffer
+    assert_equal(len(mapped.span[DType.uint8](4096, 0)), 0)
+
+
+def test_a_shared_mapping_refuses_an_empty_file() raises:
+    var path = String("/tmp/memory_region_shared_empty.bin")
+    with open(path, "w") as f:
+        f.write("")
+    with assert_raises(contains="is empty"):
+        _ = SharedMapping(path)
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

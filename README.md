@@ -27,7 +27,7 @@ shape if your tooling needs it.
 ## The idea
 
 ```mojo
-from memory_region import BumpAllocator, MappedRegion, map_shared
+from memory_region import BumpAllocator, MappedRegion, SharedMapping
 
 # Producer: lay a structure out in a shared mapping.
 var bump = BumpAllocator[MappedRegion](MappedRegion("/tmp/batch", 1 << 20))
@@ -42,12 +42,10 @@ bump.unsafe_ptr(header).unsafe_bitcast[Int64]()[unsafe_offset=0] = Int64(
 ```
 
 ```mojo
-# Consumer, in another process: map the same bytes and add its own base.
-var mapped = map_shared("/tmp/batch")
-var base = mapped[0]
-var payload_offset = Pointer[Int64, ImmUntrackedOrigin](
-    unsafe_from_address=base + 0
-)[unsafe_offset=0]
+# Consumer, in another process: map the same bytes, read them by offset.
+var mapped = SharedMapping("/tmp/batch")           # read-only, unmapped at end of scope
+var payload_offset = mapped.span[DType.int64](header, 1)[0]
+var payload = mapped.span[DType.uint8](Int(payload_offset), n)
 ```
 
 The second mapping lands at a different address than the first. Everything
@@ -62,12 +60,19 @@ still resolves, because nothing inside the region was written as an address.
 | `MappedRegion` | a file mapped `MAP_SHARED`, addressable by path |
 | `BumpAllocator[R]` | `claim(n)` and `append(span)`, both returning offsets |
 | `unsafe_ptr` / `unsafe_address` | an offset made usable, in this process only |
-| `map_shared` | the consumer's half: map an existing file read-only |
+| `SharedMapping` | the consumer's half: a file mapped read-only, with checked, origin-tracked views |
 
 A region frees or unmaps itself at end of scope, because a leaked mapping has
 no other symptom — no error, no crash, nothing in the output. `into_raw()` is
 the other ending: it consumes the region so the destructor does not run, for
 bytes that become a consumer's.
+
+`SharedMapping.span[dtype](offset, count)` returns a `Span` tied to the
+mapping. Writing through one is a compile error, because the pages are
+read-only, and so is keeping one after the mapping has gone. What a type
+cannot check, it checks at run time: the offset came from another process, so
+a span that would run past the end of the mapping, or start misaligned for
+its type, raises instead of reading garbage.
 
 Arrow wants every buffer 8-byte aligned so a consumer can cast it in place, so
 alignment is the allocator's job here rather than each caller's.
