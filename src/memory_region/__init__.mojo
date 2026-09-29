@@ -17,7 +17,11 @@ shared mapping, an object store — without serialising it.
     bump.unsafe_ptr(header).unsafe_bitcast[Int64]()[unsafe_offset=0] = Int64(payload)
     bump^.close()          # unmaps; the file stays
 
-and on the other side, `map_shared(path)` and add the base it returns.
+and on the other side:
+
+    var mapped = SharedMapping("/tmp/batch")   # read-only, unmapped at end of scope
+    var head = mapped.span[DType.int64](header, 1)[0]
+    var values = mapped.span[DType.uint8](Int(head), n)
 
 ## Dropping is safe, giving away is explicit
 
@@ -43,5 +47,6 @@ from memory_region.region import (
     HeapRegion,
     MappedRegion,
     Region,
+    SharedMapping,
     map_shared,
 )
