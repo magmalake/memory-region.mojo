@@ -193,8 +193,8 @@ struct SharedMapping(Movable):
 
     def __init__(out self, var path: String) raises:
         """Map `path` read-only, all of it."""
+        var size = file_size(path)
         var fd = open_file(path, O_RDONLY)
-        var size = file_size(fd)
         if size <= 0:
             close_fd(fd)
             raise Error("memory_region: " + path + " is empty")
@@ -310,8 +310,8 @@ def map_shared(path: String) raises -> Tuple[Int, Int]:
     Nothing ever unmaps what this returns. Kept for one release while callers
     move to `SharedMapping`.
     """
+    var size = file_size(path)
     var fd = open_file(path, O_RDONLY)
-    var size = file_size(fd)
     if size <= 0:
         close_fd(fd)
         raise Error("memory_region: " + path + " is empty")

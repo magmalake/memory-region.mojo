@@ -163,6 +163,22 @@ def test_a_shared_mapping_refuses_an_empty_file() raises:
         _ = SharedMapping(path)
 
 
+def test_a_shared_mapping_lives_beside_file_seek() raises:
+    """`FileHandle.seek` declares `lseek`; memory-region used to declare it
+    with other argument types, and a program using both didn't compile. So
+    this test compiling is half of it."""
+    var path = String("/tmp/memory_region_shared_seek.bin")
+    _ = _publish(path, [3.0])
+    with open(path, "r") as f:
+        assert_equal(Int(f.seek(0, 2)), 4096)
+    assert_equal(SharedMapping(path).size(), 4096)
+
+
+def test_a_missing_file_is_named() raises:
+    with assert_raises(contains="cannot open /tmp/memory_region_no_such"):
+        _ = SharedMapping(String("/tmp/memory_region_no_such_file.bin"))
+
+
 def test_a_span_reads_and_writes_what_was_claimed() raises:
     var bump = BumpAllocator[HeapRegion](HeapRegion(256))
     _ = bump.claim(3)  # so the next offset is not 0
