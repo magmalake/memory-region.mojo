@@ -2,7 +2,7 @@
 authors = ["Marius S <39998+winding-lines@users.noreply.github.com>"]
 channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
 name = "memory-region.mojo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Bytes that survive being moved: a region — heap or shared mapping — and a bump allocator that hands out offsets rather than addresses."
 preview = ["pixi-build"]
 platforms = ["osx-arm64", "linux-64"]
@@ -19,7 +19,7 @@ lint = { cmd = "mojolint --lsp -I src src tests" }
 # `from memory_region import …`.
 [package]
 name = "memory-region-mojo"
-version = "0.1.0"
+version = "0.1.1"
 
 [package.build]
 backend = { name = "pixi-build-mojo", version = "0.*" }
