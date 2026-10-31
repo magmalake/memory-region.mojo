@@ -6,6 +6,7 @@ platform.
 """
 
 from std.ffi import external_call
+from std.os import stat
 from std.sys.info import CompilationTarget
 
 comptime PROT_READ: Int = 1
@@ -66,9 +67,19 @@ def close_fd(fd: Int):
     _ = external_call["close", Int32](Int32(fd))
 
 
-def file_size(fd: Int) -> Int:
-    """`lseek(fd, 0, SEEK_END)`."""
-    return Int(external_call["lseek", Int64](Int32(fd), Int64(0), Int32(2)))
+def file_size(path: String) raises -> Int:
+    """The size of the file at `path`, from the standard library's `stat`.
+
+    This used to be `lseek(fd, 0, SEEK_END)` through `external_call`. The
+    standard library declares `lseek` too, for `FileHandle.seek`, with
+    different argument types, and one program can't hold two declarations of
+    one C function: any binary that used both failed to compile with
+    "existing function with conflicting signature".
+    """
+    try:
+        return Int(stat(path).st_size)
+    except:
+        raise Error("memory_region: cannot open " + path)
 
 
 def truncate(fd: Int, size: Int) -> Bool:
