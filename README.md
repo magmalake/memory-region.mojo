@@ -1,6 +1,6 @@
 # memory-region.mojo
 
-[![mojoshelf](https://mojoshelf.org/badge/memory-region-mojo.svg)](https://mojoshelf.org/tins/memory-region-mojo) [![mojo nightly](https://mojoshelf.org/badge/memory-region-mojo/nightly.svg)](https://mojoshelf.org/tins/memory-region-mojo)
+[![mojoshelf](https://mojoshelf.org/badge/memory-region-mojo.svg)](https://mojoshelf.org/tins/memory-region-mojo) [![mojo nightly](https://mojoshelf.org/badge/memory-region-mojo/nightly.svg)](https://mojoshelf.org/tins/memory-region-mojo) [![Used by](https://mojourney.dev/badge/magmalake/memory-region.mojo/used-by.svg)](https://mojourney.dev/repos/magmalake/memory-region.mojo#used-by) [![Mojo version](https://mojourney.dev/badge/magmalake/memory-region.mojo/mojo.svg)](https://mojourney.dev/repos/magmalake/memory-region.mojo)
 
 [![CI](https://github.com/magmalake/memory-region.mojo/actions/workflows/ci.yml/badge.svg)](https://github.com/magmalake/memory-region.mojo/actions/workflows/ci.yml)
 
